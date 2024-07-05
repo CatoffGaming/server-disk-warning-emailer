@@ -9,14 +9,14 @@ You can download and install the script using `wget` or `curl`.
 ### Using wget
 
 ```bash
-wget https://raw.githubusercontent.com/yourusername/disk-space-monitor/main/disk_space_monitor.sh -O /usr/local/bin/disk_space_monitor.sh
+wget https://raw.githubusercontent.com/CatoffGaming/server-disk-warning-emailer/main/disk_space_monitor.sh -O /usr/local/bin/disk_space_monitor.sh
 chmod +x /usr/local/bin/disk_space_monitor.sh
 ```
 
 ### Using curl
 
 ```bash
-curl -o /usr/local/bin/disk_space_monitor.sh https://raw.githubusercontent.com/yourusername/disk-space-monitor/main/disk_space_monitor.sh
+curl -o /usr/local/bin/disk_space_monitor.sh https://raw.githubusercontent.com/CatoffGaming/server-disk-warning-emailer/main/disk_space_monitor.sh
 chmod +x /usr/local/bin/disk_space_monitor.sh
 ```
 

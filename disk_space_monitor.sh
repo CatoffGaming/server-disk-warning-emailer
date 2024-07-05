@@ -22,6 +22,22 @@ NC='\033[0m' # No Color
 sudo mkdir -p "$CONFIG_DIR"
 sudo mkdir -p "$LOG_DIR"
 
+# Function to check and install required packages
+install_packages() {
+  REQUIRED_PKG=("postfix" "mailutils" "libsasl2-2" "ca-certificates" "libsasl2-modules" "jq")
+  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "${REQUIRED_PKG[@]}" | grep "install ok installed" | wc -l)
+  if [ "$PKG_OK" -ne ${#REQUIRED_PKG[@]} ]; then
+    echo -e "${YELLOW}Some required packages are not installed. Installing them now...${NC}"
+    sudo apt-get update
+    sudo apt-get install -y "${REQUIRED_PKG[@]}"
+  else
+    echo -e "${GREEN}All required packages are already installed.${NC}"
+  fi
+}
+
+# Ensure required packages are installed
+install_packages
+
 # Initialize configuration
 if [ ! -f "$CONFIG_FILE" ]; then
   echo '{"threshold": 80, "emails": [], "server_name": "ip-172-31-8-47"}' | sudo tee "$CONFIG_FILE" > /dev/null
@@ -134,19 +150,6 @@ show_help() {
   echo "  -ic, --install-cron INTERVAL Install a cron job with specified interval."
   echo "  -rc, --remove-cron        Remove the installed cron job."
   echo "  -h, --help                Display this help message."
-}
-
-# Function to check and install required packages
-install_packages() {
-  REQUIRED_PKG=("postfix" "mailutils" "libsasl2-2" "ca-certificates" "libsasl2-modules" "jq")
-  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "${REQUIRED_PKG[@]}" | grep "install ok installed" | wc -l)
-  if [ "$PKG_OK" -ne ${#REQUIRED_PKG[@]} ]; then
-    echo -e "${YELLOW}Some required packages are not installed. Installing them now...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y "${REQUIRED_PKG[@]}"
-  else
-    echo -e "${GREEN}All required packages are already installed.${NC}"
-  fi
 }
 
 # Function to setup Postfix
@@ -306,7 +309,7 @@ while [[ $# -gt 0 ]]; do
         shift # past value
       else
         read -p "Enter the disk usage threshold (default is $THRESHOLD): " THRESHOLD
-        THRESHOLD=${THRESHOLD:-$DEFAULT_THRESHOLD}
+        THRESHOLD=${THRESHOLD:-80}
         jq ".threshold = $THRESHOLD" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
         log_message "Threshold set to $THRESHOLD%"
         echo -e "${GREEN}Threshold set to $THRESHOLD%${NC}"

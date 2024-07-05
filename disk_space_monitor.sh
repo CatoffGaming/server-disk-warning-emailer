@@ -3,6 +3,7 @@
 # Constants
 CONFIG_DIR="/etc/disk-space-monitor"
 CONFIG_FILE="$CONFIG_DIR/config.json"
+TEMP_CONFIG_FILE="/tmp/config_temp.json"  # Temporary file in a writable directory
 LOG_DIR="/var/log/disk-space-monitor"
 LOG_FILE="$LOG_DIR/disk_space_monitor.log"
 SUBJECT="🚨 Urgent: Disk Space Alert - Immediate Action Required!"
@@ -21,22 +22,6 @@ NC='\033[0m' # No Color
 # Ensure the configuration and log directories exist
 sudo mkdir -p "$CONFIG_DIR"
 sudo mkdir -p "$LOG_DIR"
-
-# Function to check and install required packages
-install_packages() {
-  REQUIRED_PKG=("postfix" "mailutils" "libsasl2-2" "ca-certificates" "libsasl2-modules" "jq")
-  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "${REQUIRED_PKG[@]}" | grep "install ok installed" | wc -l)
-  if [ "$PKG_OK" -ne ${#REQUIRED_PKG[@]} ]; then
-    echo -e "${YELLOW}Some required packages are not installed. Installing them now...${NC}"
-    sudo apt-get update
-    sudo apt-get install -y "${REQUIRED_PKG[@]}"
-  else
-    echo -e "${GREEN}All required packages are already installed.${NC}"
-  fi
-}
-
-# Ensure required packages are installed
-install_packages
 
 # Initialize configuration
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -96,7 +81,7 @@ check_disk_usage() {
 add_email() {
   local new_email=$1
   if ! jq -e ".emails[] | select(. == \"$new_email\")" "$CONFIG_FILE" > /dev/null; then
-    jq ".emails += [\"$new_email\"]" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
+    jq ".emails += [\"$new_email\"]" "$CONFIG_FILE" > "$TEMP_CONFIG_FILE" && sudo mv "$TEMP_CONFIG_FILE" "$CONFIG_FILE"
     log_message "Email added: $new_email"
     echo -e "${GREEN}Email added: $new_email${NC}"
   else
@@ -108,7 +93,7 @@ add_email() {
 remove_email() {
   local remove_email=$1
   if jq -e ".emails[] | select(. == \"$remove_email\")" "$CONFIG_FILE" > /dev/null; then
-    jq "del(.emails[] | select(. == \"$remove_email\"))" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
+    jq "del(.emails[] | select(. == \"$remove_email\"))" "$CONFIG_FILE" > "$TEMP_CONFIG_FILE" && sudo mv "$TEMP_CONFIG_FILE" "$CONFIG_FILE"
     log_message "Email removed: $remove_email"
     echo -e "${GREEN}Email removed: $remove_email${NC}"
   else
@@ -118,7 +103,9 @@ remove_email() {
 
 # Function to list all emails
 list_emails() {
-  if [ $(jq '.emails | length' "$CONFIG_FILE") -gt 0 ]; then
+  local email_count
+  email_count=$(jq '.emails | length' "$CONFIG_FILE")
+  if [ "$email_count" -gt 0 ]; then
     echo -e "${BLUE}Registered emails:${NC}"
     jq -r '.emails[]' "$CONFIG_FILE"
   else
@@ -129,7 +116,7 @@ list_emails() {
 # Function to set server name
 set_server_name() {
   local new_server_name=$1
-  jq ".server_name = \"$new_server_name\"" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
+  jq ".server_name = \"$new_server_name\"" "$CONFIG_FILE" > "$TEMP_CONFIG_FILE" && sudo mv "$TEMP_CONFIG_FILE" "$CONFIG_FILE"
   SERVER_NAME="$new_server_name"
   log_message "Server name set to $SERVER_NAME"
   echo -e "${GREEN}Server name set to $SERVER_NAME${NC}"
@@ -150,6 +137,19 @@ show_help() {
   echo "  -ic, --install-cron INTERVAL Install a cron job with specified interval."
   echo "  -rc, --remove-cron        Remove the installed cron job."
   echo "  -h, --help                Display this help message."
+}
+
+# Function to check and install required packages
+install_packages() {
+  REQUIRED_PKG=("postfix" "mailutils" "libsasl2-2" "ca-certificates" "libsasl2-modules" "jq")
+  PKG_OK=$(dpkg-query -W --showformat='${Status}\n' "${REQUIRED_PKG[@]}" | grep "install ok installed" | wc -l)
+  if [ "$PKG_OK" -ne "${#REQUIRED_PKG[@]}" ]; then
+    echo -e "${YELLOW}Some required packages are not installed. Installing them now...${NC}"
+    sudo apt-get update
+    sudo apt-get install -y "${REQUIRED_PKG[@]}"
+  else
+    echo -e "${GREEN}All required packages are already installed.${NC}"
+  fi
 }
 
 # Function to setup Postfix
@@ -302,15 +302,15 @@ while [[ $# -gt 0 ]]; do
     -t|--threshold)
       if [ -n "$2" ]; then
         THRESHOLD="$2"
-        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
+        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" > "$TEMP_CONFIG_FILE" && sudo mv "$TEMP_CONFIG_FILE" "$CONFIG_FILE"
         log_message "Threshold set to $THRESHOLD%"
         echo -e "${GREEN}Threshold set to $THRESHOLD%${NC}"
         shift # past argument
         shift # past value
       else
         read -p "Enter the disk usage threshold (default is $THRESHOLD): " THRESHOLD
-        THRESHOLD=${THRESHOLD:-80}
-        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
+        THRESHOLD=${THRESHOLD:-$DEFAULT_THRESHOLD}
+        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" > "$TEMP_CONFIG_FILE" && sudo mv "$TEMP_CONFIG_FILE" "$CONFIG_FILE"
         log_message "Threshold set to $THRESHOLD%"
         echo -e "${GREEN}Threshold set to $THRESHOLD%${NC}"
         shift # past argument

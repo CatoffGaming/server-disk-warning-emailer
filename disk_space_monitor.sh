@@ -1,8 +1,10 @@
 #!/bin/bash
 
 # Constants
-CONFIG_FILE="./config.json"
-LOG_FILE="./disk_space_monitor.log"
+CONFIG_DIR="/etc/disk-space-monitor"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+LOG_DIR="/var/log/disk-space-monitor"
+LOG_FILE="$LOG_DIR/disk_space_monitor.log"
 SUBJECT="🚨 Urgent: Disk Space Alert - Immediate Action Required!"
 EMAIL_BODY="<h1 style='color: red;'>🚨 Warning: Critical Disk Space Usage</h1> \
             <p>The server's disk space is currently <strong>%USAGE%</strong> full. Immediate action is required to prevent potential issues.</p> \
@@ -16,9 +18,14 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Ensure the configuration and log directories exist
+sudo mkdir -p "$CONFIG_DIR"
+sudo mkdir -p "$LOG_DIR"
+
 # Initialize configuration
 if [ ! -f "$CONFIG_FILE" ]; then
-  echo '{"threshold": 80, "emails": []}' > "$CONFIG_FILE"
+  echo '{"threshold": 80, "emails": []}' | sudo tee "$CONFIG_FILE" > /dev/null
+  sudo chmod 644 "$CONFIG_FILE"
 fi
 
 # Get threshold and emails from JSON
@@ -30,7 +37,7 @@ HOSTNAME=$(hostname)
 
 # Function to log messages
 log_message() {
-  echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+  echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" | sudo tee -a "$LOG_FILE" > /dev/null
 }
 
 # Function to send email
@@ -72,7 +79,7 @@ check_disk_usage() {
 add_email() {
   local new_email=$1
   if ! jq -e ".emails[] | select(. == \"$new_email\")" "$CONFIG_FILE" > /dev/null; then
-    jq ".emails += [\"$new_email\"]" "$CONFIG_FILE" > tmp.$$.json && mv tmp.$$.json "$CONFIG_FILE"
+    jq ".emails += [\"$new_email\"]" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
     log_message "Email added: $new_email"
     echo -e "${GREEN}Email added: $new_email${NC}"
   else
@@ -84,7 +91,7 @@ add_email() {
 remove_email() {
   local remove_email=$1
   if jq -e ".emails[] | select(. == \"$remove_email\")" "$CONFIG_FILE" > /dev/null; then
-    jq "del(.emails[] | select(. == \"$remove_email\"))" "$CONFIG_FILE" > tmp.$$.json && mv tmp.$$.json "$CONFIG_FILE"
+    jq "del(.emails[] | select(. == \"$remove_email\"))" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
     log_message "Email removed: $remove_email"
     echo -e "${GREEN}Email removed: $remove_email${NC}"
   else
@@ -217,7 +224,7 @@ while [[ $# -gt 0 ]]; do
     -t|--threshold)
       if [ -n "$2" ]; then
         THRESHOLD="$2"
-        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" > tmp.$$.json && mv tmp.$$.json "$CONFIG_FILE"
+        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
         log_message "Threshold set to $THRESHOLD%"
         echo -e "${GREEN}Threshold set to $THRESHOLD%${NC}"
         shift # past argument
@@ -225,7 +232,7 @@ while [[ $# -gt 0 ]]; do
       else
         read -p "Enter the disk usage threshold (default is $THRESHOLD): " THRESHOLD
         THRESHOLD=${THRESHOLD:-$DEFAULT_THRESHOLD}
-        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" > tmp.$$.json && mv tmp.$$.json "$CONFIG_FILE"
+        jq ".threshold = $THRESHOLD" "$CONFIG_FILE" | sudo tee "$CONFIG_FILE" > /dev/null
         log_message "Threshold set to $THRESHOLD%"
         echo -e "${GREEN}Threshold set to $THRESHOLD%${NC}"
         shift # past argument

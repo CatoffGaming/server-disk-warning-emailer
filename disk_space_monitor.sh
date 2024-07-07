@@ -251,7 +251,7 @@ install_cron() {
     echo -e "${YELLOW}Cron job already exists.${NC}"
     log_message "Cron job already exists."
   else
-    (sudo crontab -l 2>/dev/null; echo "$cron_expression /usr/local/bin/disk_space_monitor.sh --check") | sudo crontab -
+    (sudo crontab -l 2>/dev/null; echo "$cron_expression /usr/local/bin/disk_space_monitor.sh --check >> $LOG_FILE 2>&1") | sudo crontab -
     log_message "Cron job installed to run $interval."
     echo -e "${GREEN}Cron job installed to run $interval.${NC}"
   fi
